@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab-ingress-settings
+  namespace: httproute-lab
+data:
+  service: |
+    spec:
+      type: ClusterIP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: lab-ingress
+  namespace: httproute-lab
+spec:
+  gatewayClassName: istio
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: lab-ingress-settings
+  listeners:
+    - name: http
+      hostname: shop.httproute.test
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: storefront-ingress
+  namespace: httproute-lab
+spec:
+  parentRefs:
+    - name: lab-ingress
+      sectionName: http
+  hostnames:
+    - shop.httproute.test
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /shop
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: x-lab-ingress-route
+                value: storefront-ingress
+      backendRefs:
+        - name: storefront
+          port: 8080
